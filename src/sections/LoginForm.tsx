@@ -61,7 +61,7 @@ const LoginForm: React.FC = () => {
       setIsSubmitting(true);
       try {
         await login(values.username);
-       // navigate('/dashboard', { replace: true });
+        navigate('/dashboard', { replace: true });
       } finally {
         setIsSubmitting(false);
       }
