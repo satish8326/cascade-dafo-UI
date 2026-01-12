@@ -16,7 +16,7 @@ export const FormInput: React.FC<FormInputProps> = ({ name, label, ...rest }) =>
       {...rest}
       sx={{
         '& .MuiOutlinedInput-root': {
-          borderRadius: 999,
+          borderRadius: '5px',
           backgroundColor: '#ffffff'
         },
         ...rest.sx

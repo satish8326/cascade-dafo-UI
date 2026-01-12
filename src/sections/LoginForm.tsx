@@ -4,6 +4,11 @@ import Typography from '@mui/material/Typography';
 import Link from '@mui/material/Link';
 import FormInput from '../components/FormInput';
 import PrimaryButton from '../components/PrimaryButton';
+import SignUpForm from '../components/SignUpForm';
+import NameSearchForm from '../components/NameSearchForm';
+import AccountValidationForm from '../components/AccountValidationForm';
+import OtpVerificationForm from '../components/OtpVerificationForm';
+import LoginSuccess from '../components/LoginSuccess';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,33 +22,38 @@ interface FieldErrors {
   password?: string;
 }
 
-const initialValues: LoginFormValues = {
+const initialLoginValues: LoginFormValues = {
   username: '',
   password: ''
 };
 
 const LoginForm: React.FC = () => {
-  const [values, setValues] = useState<LoginFormValues>(initialValues);
+  const [isSignUp, setIsSignUp] = useState<boolean>(false);
+  const [isNameSearch, setIsNameSearch] = useState<boolean>(false);
+  const [isAccountValidation, setIsAccountValidation] = useState<boolean>(false);
+  const [isOtpVerification, setIsOtpVerification] = useState<boolean>(false);
+  const [isSignUpSuccess, setIsSignUpSuccess] = useState<boolean>(false);
+  const [loginValues, setLoginValues] = useState<LoginFormValues>(initialLoginValues);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleChange = (field: keyof LoginFormValues) => (
+  const handleLoginChange = (field: keyof LoginFormValues) => (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setValues(prev => ({ ...prev, [field]: event.target.value }));
+    setLoginValues(prev => ({ ...prev, [field]: event.target.value }));
     setErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
-  const validate = (): boolean => {
+  const validateLogin = (): boolean => {
     const newErrors: FieldErrors = {};
 
-    if (!values.username.trim()) {
+    if (!loginValues.username.trim()) {
       newErrors.username = 'Username is required';
     }
 
-    if (!values.password.trim()) {
+    if (!loginValues.password.trim()) {
       newErrors.password = 'Password is required';
     }
 
@@ -51,16 +61,16 @@ const LoginForm: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
+  const handleLoginSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    if (!validate()) {
+    if (!validateLogin()) {
       return;
     }
 
     const run = async () => {
       setIsSubmitting(true);
       try {
-        await login(values.username);
+        await login(loginValues.username);
         navigate('/dashboard', { replace: true });
       } finally {
         setIsSubmitting(false);
@@ -69,13 +79,132 @@ const LoginForm: React.FC = () => {
 
     void run();
   };
+
+  const handleSignUpSubmit = async (values: { firstName: string; lastName: string; phone: string; email: string }): Promise<void> => {
+    void values;
+    setIsSignUp(false);
+    setIsOtpVerification(true);
+  };
+
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const isLabelFloating = (field: string) => {
-    return focusedField === field || values[field as keyof typeof values].length > 0;
+    return focusedField === field || loginValues[field as keyof typeof loginValues]?.length > 0;
   };
+
+  const handleFocus = (field: string) => () => {
+    setFocusedField(field);
+  };
+
+  const handleBlur = () => {
+    setFocusedField(null);
+  };
+
+  const toggleForm = () => {
+    setIsSignUp(false);
+    setIsNameSearch(false);
+    setIsAccountValidation(!isAccountValidation);
+    setIsOtpVerification(false);
+    setIsSignUpSuccess(false);
+    setErrors({});
+    setFocusedField(null);
+  };
+
+  const toggleFormToLogin = () => {
+    setIsAccountValidation(false);
+    setIsSignUpSuccess(false);
+    setErrors({});
+    
+  };
+
+  const handleNameSearchSubmit = async (selectedName: string) : Promise<void> => {
+    setIsSubmitting(true);
+    try {
+      void selectedName;
+      setIsOtpVerification(false);
+      setIsSignUpSuccess(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAccountValidationSubmit = async (values: { accountNumber: string; billingZipCode: string }): Promise<void> => {
+    void values;
+    setIsAccountValidation(false);
+    setIsSignUp(false);
+    setIsNameSearch(true);
+  };
+
+  const handleOtpSubmit = async (values: { method: 'email' | 'phone'; code: string }): Promise<void> => {
+    setIsSubmitting(true);
+    try {
+      void values;
+      setIsOtpVerification(false);
+      setIsSignUpSuccess(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRegisterAsNew = async () => {
+    setIsNameSearch(false);
+    setIsSignUp(true);
+  };
+
+  if (isSignUpSuccess) {
+    return (
+      <LoginSuccess
+        onGoToLogin={toggleFormToLogin}
+      />
+    );
+  }
+
+  if (isOtpVerification) {
+    return (
+      <OtpVerificationForm
+        onSubmit={handleOtpSubmit}
+        onToggleToLogin={toggleForm}
+        isSubmitting={isSubmitting}
+      />
+    );
+  }
+
+  if (isAccountValidation) {
+    return (
+      <AccountValidationForm
+        onSubmit={handleAccountValidationSubmit}
+        onToggleToLogin={toggleForm}
+        isSubmitting={isSubmitting}
+      />
+    );
+  }
+
+  if (isNameSearch) {
+    return (
+      <NameSearchForm
+        onSubmit={handleNameSearchSubmit}
+        onToggleToLogin={toggleForm}
+        onRegisterAsNew={handleRegisterAsNew}
+        isSubmitting={isSubmitting}
+      />
+    );
+  }
+
+  if (isSignUp) {
+    return (
+      <Box>
+        <SignUpForm
+          onSubmit={handleSignUpSubmit}
+          onToggleToLogin={toggleForm}
+          isSubmitting={isSubmitting}
+        />
+
+      </Box>
+    );
+  }
+
   return (
-    <Box component="form" onSubmit={handleSubmit} noValidate>
+    <Box component="form" onSubmit={handleLoginSubmit} noValidate>
       <Typography
         variant="h5"
         sx={{
@@ -84,7 +213,6 @@ const LoginForm: React.FC = () => {
           textAlign: 'left',
           mt: 1,
           mb: 1
-
         }}
       >
         Login
@@ -113,18 +241,20 @@ const LoginForm: React.FC = () => {
           label=""
           type="email"
           autoComplete="email"
-          value={values.username}
-          onChange={handleChange('username')}
+          value={loginValues.username}
+          onChange={handleLoginChange('username')}
+          onFocus={handleFocus('username')}
+          onBlur={handleBlur}
           error={Boolean(errors.username)}
           helperText={errors.username}
           inputProps={{ 'aria-label': 'Username' }}
-         sx={{
+          sx={{
             '& .MuiInputBase-root': {
               height: 46,
             },
             '& .MuiInputBase-input': {
               padding: '10px 10px',
-              fontSize: '14px', // ✅ correct place
+              fontSize: '14px',
             },
           }}
         />
@@ -153,8 +283,10 @@ const LoginForm: React.FC = () => {
           label=""
           type="password"
           autoComplete="current-password"
-          value={values.password}
-          onChange={handleChange('password')}
+          value={loginValues.password}
+          onChange={handleLoginChange('password')}
+          onFocus={handleFocus('password')}
+          onBlur={handleBlur}
           error={Boolean(errors.password)}
           helperText={errors.password}
           inputProps={{ 'aria-label': 'Password' }}
@@ -164,7 +296,7 @@ const LoginForm: React.FC = () => {
             },
             '& .MuiInputBase-input': {
               padding: '10px 10px',
-              fontSize: '14px', // ✅ correct place
+              fontSize: '14px',
             },
           }}
         />
@@ -195,13 +327,14 @@ const LoginForm: React.FC = () => {
         </Link>
       </Box>
 
-      <PrimaryButton type="submit" disabled={isSubmitting}
-      sx={{
-        fontSize: 16, // ✅ adjust font size
-        fontWeight: 500, // ✅ make text bold
-    borderRadius: '8px', // ✅ add radius
-
-  }}
+      <PrimaryButton
+        type="submit"
+        disabled={isSubmitting}
+        sx={{
+          fontSize: 16,
+          fontWeight: 500,
+          borderRadius: '8px'
+        }}
       >
         {isSubmitting ? 'Logging in…' : 'Login'}
       </PrimaryButton>
@@ -219,9 +352,7 @@ const LoginForm: React.FC = () => {
           type="button"
           underline="hover"
           sx={{ fontWeight: 600, fontSize: 13 }}
-          onClick={() => {
-            // placeholder for sign-up navigation
-          }}
+          onClick={toggleForm}
         >
           Sign Up
         </Link>
@@ -231,5 +362,3 @@ const LoginForm: React.FC = () => {
 };
 
 export default LoginForm;
-
-
