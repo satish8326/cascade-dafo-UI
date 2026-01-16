@@ -1,55 +1,54 @@
-import { createTheme } from '@mui/material/styles';
+import { createTheme } from "@mui/material/styles";
 
 export const theme = createTheme({
   palette: {
     primary: {
-      main: '#2d5499',
-      light: '#5776b3',
-      dark: '#1c3768',
-      contrastText: '#ffffff'
+      main: "#2d5499",
+      light: "#5776b3",
+      dark: "#1c3768",
+      contrastText: "#ffffff",
     },
     background: {
-      default: '#e3f2fd',
-      paper: '#ffffff'
-    }
+      default: "#e3f2fd",
+      paper: "#ffffff",
+    },
   },
   shape: {
-    borderRadius: 12
+    borderRadius: 12,
   },
-    typography: {
+  typography: {
     fontFamily: [
-      'Poppins',
-      '-apple-system',
-      'BlinkMacSystemFont',
+      "Poppins",
+      "-apple-system",
+      "BlinkMacSystemFont",
       '"Segoe UI"',
-      'Roboto',
+      "Roboto",
       '"Helvetica Neue"',
-      'Arial',
-      'sans-serif',
-    ].join(','),
+      "Arial",
+      "sans-serif",
+    ].join(","),
     h4: {
-      fontWeight: 600
+      fontWeight: 600,
     },
     button: {
-      textTransform: 'none',
-      fontWeight: 600
-    }
+      textTransform: "none",
+      fontWeight: 600,
+    },
   },
   components: {
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 999
-        }
-      }
+          borderRadius: 999,
+          minWidth: 40,
+        },
+      },
     },
     MuiTextField: {
       defaultProps: {
-        variant: 'outlined',
-        size: 'medium'
-      }
-    }
-  }
+        variant: "outlined",
+        size: "medium",
+      },
+    },
+  },
 });
-
-

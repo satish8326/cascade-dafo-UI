@@ -1,15 +1,28 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import { getAccount } from '../auth/acquireToken';
+import { msalInstance,  } from '../auth/msalInstance';
+import type { AccountInfo, RedirectRequest } from '@azure/msal-browser';
 
 export interface User {
   name: string;
   organization: string;
+  email?: string;
+  account?: AccountInfo;
 }
 
 export interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean;
-  login: (username: string) => Promise<void>;
-  logout: () => void;
+  isLoading: boolean;
+  loginRedirect: (email?: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -26,42 +39,103 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const STORAGE_KEY = 'cascadeDafoAuth';
-
+/**
+ * Production-ready AuthProvider with MSAL integration
+ * Handles authentication state, user session, and MSAL redirect flow
+ */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    const initializeAuth = async (): Promise<void> => {
       try {
-        const parsed = JSON.parse(stored) as User;
-        setUser(parsed);
-      } catch {
-        window.localStorage.removeItem(STORAGE_KEY);
+        // First check if we're returning from a redirect
+        const redirectResponse = await msalInstance.handleRedirectPromise();
+
+        if (redirectResponse?.account) {
+          const userData: User = {
+            name: redirectResponse.account.name || redirectResponse.account.username || 'User',
+            organization: 'Organization',
+            email: redirectResponse.account.username,
+            account: redirectResponse.account,
+          };
+          setUser(userData);
+          setIsLoading(false);
+          return;
+        }
+
+        // If no redirect response, check for existing account
+        const account = getAccount();
+        if (account) {
+          const userData: User = {
+            name: account.name || account.username || 'User',
+            organization: 'Organization',
+            email: account.username,
+            account,
+          };
+          setUser(userData);
+          setIsLoading(false);
+          return;
+        }
+
+        setIsLoading(false);
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.error('Auth initialization error:', error);
+        }
+        setIsLoading(false);
       }
+    };
+
+    void initializeAuth();
+  }, []);
+
+  /**
+   * MSAL login redirect
+   * Uses full-page redirect to Microsoft login.
+   */
+   const getLoginRequest = (email?: string): RedirectRequest => ({
+    scopes: [],
+    prompt: "login",
+    ...(email && { loginHint: email }),
+  });
+  const loginRedirect = useCallback(async (email?: string): Promise<void> => {
+    try {
+      let loginRequest = getLoginRequest(email);
+      await msalInstance.loginRedirect(loginRequest);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.error('Login redirect error:', error);
+      }
+      throw error;
     }
   }, []);
 
-  const login = async (username: string): Promise<void> => {
-    const mockUser: User = {
-      name: username || 'James Smith',
-      organization: 'Hanger Clinic'
-    };
-    setUser(mockUser);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
-  };
-
-  const logout = (): void => {
-    setUser(null);
-    window.localStorage.removeItem(STORAGE_KEY);
-  };
+  /**
+   * Logout user and clear MSAL cache
+   */
+  const logout = useCallback(async () => {
+      const account = getAccount();
+      if (!account) return;
+  
+      await msalInstance.logoutRedirect({
+        account,
+        postLogoutRedirectUri: "/login",
+      });
+    },
+    [msalInstance, getAccount]
+  );
+  
 
   const value: AuthContextValue = {
     user,
-    isAuthenticated: Boolean(user),
-    login,
-    logout
+    isAuthenticated: Boolean(user || getAccount()),
+    isLoading,
+    logout,
+    loginRedirect,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Link from '@mui/material/Link';
-import FormInput from './FormInput';
-import PrimaryButton from './PrimaryButton';
+import React, { useCallback, useState } from "react";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import FormInput from "./FormInput";
+import PrimaryButton from "./PrimaryButton";
+import CommonLoader from "./Loaders/CommonLoader";
+import { SignUpUser } from "../api/modules/loginSignup/signup-service";
+import { AxiosError } from "axios";
+import { useMutation } from "@tanstack/react-query";
+import { AlertComponent } from "./Common/AlertComponent";
+import { Button } from "@mui/material";
 
 interface AccountValidationFormProps {
-  onSubmit: (values: { accountNumber: string; billingZipCode: string }) => Promise<void>;
+  onSubmit: (values: {
+    accountNumber: string;
+    billingZipCode: string;
+    customerId?: string;
+  }) => Promise<void>;
   onToggleToLogin: () => void;
   isSubmitting: boolean;
 }
@@ -19,33 +28,67 @@ interface FieldErrors {
 const AccountValidationForm: React.FC<AccountValidationFormProps> = ({
   onSubmit,
   onToggleToLogin,
-  isSubmitting
+  isSubmitting,
 }) => {
   const [values, setValues] = useState({
-    accountNumber: '',
-    billingZipCode: ''
+    accountNumber: "",
+    billingZipCode: "",
   });
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [alertModel, setAlertModel] = useState<any>({
+    open: false,
+    message: "",
+  });
+  const [validatAccountCount, setValidAccountCount] = useState<number>(0);
 
-  const handleChange = (field: keyof typeof values) => (
+  // const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const VALIDATION_RULES = {
+    accountNumber: (val: string) => {
+      if (!val?.trim()) return "Account Number is required";
+      if (!/^\d+$/.test(val) || val.length !== 7)
+        return "Invalid Account Number.";
+      return "";
+    },
+    billingZipCode: (val: string) => {
+      if (!val.trim()) return "Billing Zip Code is required";
+      if (!/^[a-zA-Z0-9]+$/.test(val) || val.length < 4 || val.length > 12)
+        return "Invalid Billing Zip Code";
+      return "";
+    },
+  };
+
+  const handleChange = (
+    field: keyof typeof values,
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setValues(prev => ({ ...prev, [field]: event.target.value }));
-    setErrors(prev => ({ ...prev, [field]: undefined }));
+    setValues((prev) => ({ ...prev, [field]: event.target.value }));
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
+
+  // Inside the component
+  const validateValuesOnChange = useCallback(
+    (name: string, event: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = event.target;
+      const rule = VALIDATION_RULES[name as keyof typeof VALIDATION_RULES];
+      const error = rule ? rule(value) : "";
+
+      setErrors((prev: any) =>
+        prev[name] === error ? prev : { ...prev, [name]: error }
+      );
+    },
+    []
+  );
 
   const validate = (): boolean => {
     const newErrors: FieldErrors = {};
 
     if (!values.accountNumber.trim()) {
-      newErrors.accountNumber = 'Account Number is required';
+      newErrors.accountNumber = "Account Number is required";
     }
 
     if (!values.billingZipCode.trim()) {
-      newErrors.billingZipCode = 'Billing Zip Code is required';
-    } else if (!/^\d{5}(-\d{4})?$/.test(values.billingZipCode.trim())) {
-      newErrors.billingZipCode = 'Enter a valid zip code';
+      newErrors.billingZipCode = "Billing Zip Code is required";
     }
 
     setErrors(newErrors);
@@ -57,38 +100,80 @@ const AccountValidationForm: React.FC<AccountValidationFormProps> = ({
     if (!validate()) {
       return;
     }
+    // else signUpUser(values);
     void onSubmit(values);
   };
 
-  const isLabelFloating = (field: string) => {
-    return focusedField === field || values[field as keyof typeof values]?.length > 0;
-  };
+  // ........................API..................//
 
-  const handleFocus = (field: string) => () => {
-    setFocusedField(field);
-  };
+  const { isPending: isSigningLoading, mutate: signUpUser } = useMutation({
+    mutationFn: SignUpUser,
+    onSuccess: (response) => {
+      // const mockRes = {
+      //   customerId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      //   isValid: true,
+      //   isValidAccountId: true,
+      //   enableNewRequest: false,
+      //   isActive: true,
+      //   responseMessage: "string",
+      // };
+      if (response?.data?.isValid) {
+        onSubmit({ ...values, customerId: response?.data?.customerId });
+      } else {
+        setAlertModel({
+          open: true,
+          message: "Invalid Account Number or Billing Zip Code.",
+        });
+        if (response?.data?.enableNewRequest) {
+          //
+        }
+        // is invalid account
+        if (response?.data?.isValidAccountId === false) {
+          setErrors({
+            accountNumber: "Invalid Account Number.",
+            billingZipCode: "",
+          });
+          setValidAccountCount(validatAccountCount + 1);
+        } else if (response?.data?.isActive === false) {
+          setAlertModel({
+            open: true,
+            message:
+              "Account Number is not an active account. Contact Customer Support.",
+          });
+        }
+      }
+    },
+    onError: (error: AxiosError) => {
+      console.log(error.response?.data);
+    },
+  });
 
-  const handleBlur = () => {
-    setFocusedField(null);
-  };
-
+  //-------------------------END-------------------------//
   return (
-    <Box component="form" onSubmit={handleSubmit} noValidate>
-      <Typography
-        variant="h5"
-        sx={{
-          fontWeight: 500,
-          fontSize: 18,
-          textAlign: 'left',
-          mt: 1,
-          mb: 1
-        }}
-      >
-        Sign up
-      </Typography>
-
-      <Box sx={{ position: 'relative' }}>
+    <>
+      <AlertComponent
+        severity="error"
+        open={alertModel?.open}
+        message={alertModel?.message || ""}
+        onClose={() => setAlertModel({ open: false, message: "" })}
+      />
+      <CommonLoader loading={isSubmitting || isSigningLoading} />
+      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ px: 2 }}>
         <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 500,
+            fontSize: 21,
+            textAlign: "left",
+            mt: 1,
+            mb: 1,
+          }}
+        >
+          Sign up
+        </Typography>
+
+        <Box sx={{ position: "relative" }}>
+          {/* <Typography
           variant="caption"
           sx={{
             position: 'absolute',
@@ -105,33 +190,25 @@ const AccountValidationForm: React.FC<AccountValidationFormProps> = ({
           }}
         >
           Account Number
-        </Typography>
-        <FormInput
-          name="accountNumber"
-          label=""
-          type="text"
-          autoComplete="off"
-          value={values.accountNumber}
-          onChange={handleChange('accountNumber')}
-          onFocus={handleFocus('accountNumber')}
-          onBlur={handleBlur}
-          error={Boolean(errors.accountNumber)}
-          helperText={errors.accountNumber}
-          inputProps={{ 'aria-label': 'Account Number' }}
-          sx={{
-            '& .MuiInputBase-root': {
-              height: 46,
-            },
-            '& .MuiInputBase-input': {
-              padding: '10px 10px',
-              fontSize: '14px',
-            },
-          }}
-        />
-      </Box>
+        </Typography> */}
+          <FormInput
+            name="accountNumber"
+            label="Account Number"
+            type="text"
+            autoComplete="off"
+            value={values.accountNumber}
+            onChange={(e: any) => {
+              handleChange("accountNumber", e);
+              validateValuesOnChange("accountNumber", e);
+            }}
+            error={Boolean(errors.accountNumber)}
+            helperText={errors.accountNumber}
+            inputProps={{ "aria-label": "Account Number" }}
+          />
+        </Box>
 
-      <Box sx={{ position: 'relative' }}>
-        <Typography
+        <Box sx={{ position: "relative", mt: 0 }}>
+          {/* <Typography
           variant="caption"
           sx={{
             position: 'absolute',
@@ -148,65 +225,77 @@ const AccountValidationForm: React.FC<AccountValidationFormProps> = ({
           }}
         >
           Billing Zip Code
-        </Typography>
-        <FormInput
-          name="billingZipCode"
-          label=""
-          type="text"
-          autoComplete="postal-code"
-          value={values.billingZipCode}
-          onChange={handleChange('billingZipCode')}
-          onFocus={handleFocus('billingZipCode')}
-          onBlur={handleBlur}
-          error={Boolean(errors.billingZipCode)}
-          helperText={errors.billingZipCode}
-          inputProps={{ 'aria-label': 'Billing Zip Code', maxLength: 10 }}
+        </Typography> */}
+          <FormInput
+            name="billingZipCode"
+            label="Billing Zip Code"
+            type="text"
+            autoComplete="postal-code"
+            value={values.billingZipCode}
+            onChange={(e: any) => {
+              handleChange("billingZipCode", e);
+              validateValuesOnChange("billingZipCode", e);
+            }}
+            error={Boolean(errors.billingZipCode)}
+            helperText={errors.billingZipCode}
+            inputProps={{ "aria-label": "Billing Zip Code", maxLength: 12 }}
+          />
+        </Box>
+
+        <PrimaryButton
+          type="submit"
+          disabled={isSubmitting}
           sx={{
-            '& .MuiInputBase-root': {
-              height: 46,
-            },
-            '& .MuiInputBase-input': {
-              padding: '10px 10px',
-              fontSize: '14px',
-            },
+            fontSize: 16,
+            fontWeight: 500,
+            borderRadius: "8px",
+            mt: 6,
+            mb: 2,
+            height: 48,
           }}
-        />
-      </Box>
-
-      <PrimaryButton
-        type="submit"
-        disabled={isSubmitting}
-        sx={{
-          fontSize: 16,
-          fontWeight: 500,
-          borderRadius: '8px',
-          mt: 2,
-          mb: 2
-        }}
-      >
-        {isSubmitting ? 'Validating…' : 'Validate'}
-      </PrimaryButton>
-
-      <Box
-        sx={{
-          textAlign: 'center',
-          fontSize: 13
-        }}
-      >
-        <span>Already have an account? </span>
-        <Link
-          component="button"
-          type="button"
-          underline="hover"
-          sx={{ fontWeight: 600, fontSize: 13 }}
-          onClick={onToggleToLogin}
         >
-          Log in
-        </Link>
+          Next
+        </PrimaryButton>
+        {validatAccountCount >= 3 && (
+          <Button
+            fullWidth
+            disabled={false}
+            variant="outlined"
+            sx={{
+              fontSize: 16,
+              fontWeight: 500,
+              borderRadius: "8px",
+              mb: 2,
+              height: 48,
+            }}
+          >
+            Request New Account
+          </Button>
+        )}
+
+        <Box
+          sx={{
+            textAlign: "center",
+            fontSize: 16,
+          }}
+        >
+          <span>Already have an account? </span>
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: 16,
+              color: "#0088CB",
+              cursor: "pointer",
+              paddingLeft: "6px",
+            }}
+            onClick={onToggleToLogin}
+          >
+            Log in
+          </span>
+        </Box>
       </Box>
-    </Box>
+    </>
   );
 };
 
 export default AccountValidationForm;
-

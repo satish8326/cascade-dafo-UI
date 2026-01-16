@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Link from '@mui/material/Link';
-import FormInput from './FormInput';
-import PrimaryButton from './PrimaryButton';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import React, { useState } from "react";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import FormInput from "./FormInput";
+import PrimaryButton from "./PrimaryButton";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { Checkbox, FormControlLabel } from "@mui/material";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 interface SignUpFormValues {
   firstName: string;
@@ -26,42 +27,52 @@ interface SignUpFormProps {
   isSubmitting: boolean;
 }
 
-const SignUpForm: React.FC<SignUpFormProps> = ({ onSubmit, onToggleToLogin, isSubmitting }) => {
+const SignUpForm: React.FC<SignUpFormProps> = ({
+  onSubmit,
+  onToggleToLogin,
+  isSubmitting,
+}) => {
   const [values, setValues] = useState<SignUpFormValues>({
-    firstName: '',
-    lastName: '',
-    phone: '',
-    email: ''
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
   });
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string>("");
+  const [showCaptcha, setShowCaptcha] = useState<boolean>(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const handleChange = (field: keyof SignUpFormValues) => (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setValues(prev => ({ ...prev, [field]: event.target.value }));
-    setErrors(prev => ({ ...prev, [field]: undefined }));
-  };
+  const handleChange =
+    (field: keyof SignUpFormValues) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setValues((prev) => ({ ...prev, [field]: event.target.value }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    };
 
   const validate = (): boolean => {
     const newErrors: FieldErrors = {};
 
     if (!values.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
+      newErrors.firstName = "First name is required";
     }
 
     if (!values.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
+      newErrors.lastName = "Last name is required";
     }
 
     if (!values.phone.trim()) {
-      newErrors.phone = 'Phone is required';
+      newErrors.phone = "Phone is required";
     }
 
     if (!values.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
-      newErrors.email = 'Enter a valid email';
+      newErrors.email = "Enter a valid email";
+    }
+
+    if (!captchaToken) {
+      setCaptchaError("Please verify you are human");
     }
 
     setErrors(newErrors);
@@ -76,26 +87,14 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSubmit, onToggleToLogin, isSu
     void onSubmit(values);
   };
 
-  const isLabelFloating = (field: string) => {
-    return focusedField === field || values[field as keyof typeof values]?.length > 0;
-  };
-
-  const handleFocus = (field: string) => () => {
-    setFocusedField(field);
-  };
-
-  const handleBlur = () => {
-    setFocusedField(null);
-  };
-
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
       <Box
         sx={{
-          display: 'flex',
-          alignItems: 'center',
+          display: "flex",
+          alignItems: "center",
           mb: 2,
-          cursor: 'pointer'
+          cursor: "pointer",
         }}
         onClick={onToggleToLogin}
       >
@@ -104,203 +103,234 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSubmit, onToggleToLogin, isSu
           variant="h5"
           sx={{
             fontWeight: 500,
-            fontSize: 18,
-            textAlign: 'left'
+            fontSize: 21,
+            textAlign: "left",
           }}
         >
           Sign up
         </Typography>
       </Box>
-
-      <Box sx={{ display: 'flex', gap: 2 }}>
-        <Box sx={{ position: 'relative', flex: 1 }}>
-          <Typography
+      <Typography
+        variant="body2"
+        sx={{
+          color: "#000000",
+          fontSize: 16,
+        }}
+      >
+        Don’t see your name on the list? <br /> Just enter your details to
+        finish signing up.
+      </Typography>
+      <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
+        <Box sx={{ position: "relative", flex: 1 }}>
+          {/* <Typography
             variant="caption"
             sx={{
-              position: 'absolute',
+              position: "absolute",
               left: 16,
-              top: isLabelFloating('firstName') ? 8 : '24%',
-              transform: isLabelFloating('firstName') ? 'translateY(0)' : 'translateY(-50%)',
-              transition: 'all 0.2s ease-in-out',
-              backgroundColor: 'background.paper',
+              top: isLabelFloating("firstName") ? 8 : "24%",
+              transform: isLabelFloating("firstName")
+                ? "translateY(0)"
+                : "translateY(-50%)",
+              transition: "all 0.2s ease-in-out",
+              backgroundColor: "background.paper",
               px: 0.5,
-              color: 'text.secondary',
-              fontSize: '0.75rem',
-              pointerEvents: 'none',
-              zIndex: 1
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              pointerEvents: "none",
+              zIndex: 1,
             }}
           >
             First Name
-          </Typography>
+          </Typography> */}
           <FormInput
             name="firstName"
-            label=""
+            label="First Name"
             type="text"
             autoComplete="given-name"
             value={values.firstName}
-            onChange={handleChange('firstName')}
-            onFocus={handleFocus('firstName')}
-            onBlur={handleBlur}
+            onChange={handleChange("firstName")}
             error={Boolean(errors.firstName)}
             helperText={errors.firstName}
-            inputProps={{ 'aria-label': 'First Name' }}
-            sx={{
-              '& .MuiInputBase-root': {
-                height: 46,
-              },
-              '& .MuiInputBase-input': {
-                padding: '10px 10px',
-                fontSize: '14px',
-              },
-            }}
+            inputProps={{ "aria-label": "First Name", maxLength: 40 }}
           />
         </Box>
 
-        <Box sx={{ position: 'relative', flex: 1 }}>
-          <Typography
+        <Box sx={{ position: "relative", flex: 1 }}>
+          {/* <Typography
             variant="caption"
             sx={{
-              position: 'absolute',
+              position: "absolute",
               left: 16,
-              top: isLabelFloating('lastName') ? 8 : '24%',
-              transform: isLabelFloating('lastName') ? 'translateY(0)' : 'translateY(-50%)',
-              transition: 'all 0.2s ease-in-out',
-              backgroundColor: 'background.paper',
+              top: isLabelFloating("lastName") ? 8 : "24%",
+              transform: isLabelFloating("lastName")
+                ? "translateY(0)"
+                : "translateY(-50%)",
+              transition: "all 0.2s ease-in-out",
+              backgroundColor: "background.paper",
               px: 0.5,
-              color: 'text.secondary',
-              fontSize: '0.75rem',
-              pointerEvents: 'none',
-              zIndex: 1
+              color: "text.secondary",
+              fontSize: "0.75rem",
+              pointerEvents: "none",
+              zIndex: 1,
             }}
           >
             Last Name
-          </Typography>
+          </Typography> */}
           <FormInput
             name="lastName"
-            label=""
+            label="Last Name"
             type="text"
             autoComplete="family-name"
             value={values.lastName}
-            onChange={handleChange('lastName')}
-            onFocus={handleFocus('lastName')}
-            onBlur={handleBlur}
+            onChange={handleChange("lastName")}
+            // onFocus={handleFocus("lastName")}
+            // onBlur={handleBlur}
             error={Boolean(errors.lastName)}
             helperText={errors.lastName}
-            inputProps={{ 'aria-label': 'Last Name' }}
-            sx={{
-              '& .MuiInputBase-root': {
-                height: 46,
-              },
-              '& .MuiInputBase-input': {
-                padding: '10px 10px',
-                fontSize: '14px',
-              },
-            }}
+            inputProps={{ "aria-label": "Last Name", maxLength: 40 }}
           />
         </Box>
       </Box>
 
-      <Box sx={{ position: 'relative' }}>
-        <Typography
+      <Box sx={{ position: "relative" }}>
+        {/* <Typography
           variant="caption"
           sx={{
-            position: 'absolute',
+            position: "absolute",
             left: 16,
-            top: isLabelFloating('phone') ? 8 : '24%',
-            transform: isLabelFloating('phone') ? 'translateY(0)' : 'translateY(-50%)',
-            transition: 'all 0.2s ease-in-out',
-            backgroundColor: 'background.paper',
+            top: isLabelFloating("phone") ? 8 : "24%",
+            transform: isLabelFloating("phone")
+              ? "translateY(0)"
+              : "translateY(-50%)",
+            transition: "all 0.2s ease-in-out",
+            backgroundColor: "background.paper",
             px: 0.5,
-            color: 'text.secondary',
-            fontSize: '0.75rem',
-            pointerEvents: 'none',
-            zIndex: 1
+            color: "text.secondary",
+            fontSize: "0.75rem",
+            pointerEvents: "none",
+            zIndex: 1,
           }}
         >
           Phone
-        </Typography>
+        </Typography> */}
         <FormInput
           name="phone"
-          label=""
+          label="Phone"
           type="tel"
           autoComplete="tel"
           value={values.phone}
-          onChange={handleChange('phone')}
-          onFocus={handleFocus('phone')}
-          onBlur={handleBlur}
+          onChange={handleChange("phone")}
           error={Boolean(errors.phone)}
           helperText={errors.phone}
-          inputProps={{ 'aria-label': 'Phone' }}
-          sx={{
-            '& .MuiInputBase-root': {
-              height: 46,
-            },
-            '& .MuiInputBase-input': {
-              padding: '10px 10px',
-              fontSize: '14px',
-            },
-          }}
+          inputProps={{ "aria-label": "Phone", maxLength: 12 }}
         />
       </Box>
 
-      <Box sx={{ position: 'relative' }}>
-        <Typography
+      <Box sx={{ position: "relative" }}>
+        {/* <Typography
           variant="caption"
           sx={{
-            position: 'absolute',
+            position: "absolute",
             left: 16,
-            top: isLabelFloating('email') ? 8 : '24%',
-            transform: isLabelFloating('email') ? 'translateY(0)' : 'translateY(-50%)',
-            transition: 'all 0.2s ease-in-out',
-            backgroundColor: 'background.paper',
+            top: isLabelFloating("email") ? 8 : "24%",
+            transform: isLabelFloating("email")
+              ? "translateY(0)"
+              : "translateY(-50%)",
+            transition: "all 0.2s ease-in-out",
+            backgroundColor: "background.paper",
             px: 0.5,
-            color: 'text.secondary',
-            fontSize: '0.75rem',
-            pointerEvents: 'none',
-            zIndex: 1
+            color: "text.secondary",
+            fontSize: "0.75rem",
+            pointerEvents: "none",
+            zIndex: 1,
           }}
         >
           Email
-        </Typography>
+        </Typography> */}
         <FormInput
           name="email"
-          label=""
+          label="Email"
           type="email"
           autoComplete="email"
           value={values.email}
-          onChange={handleChange('email')}
-          onFocus={handleFocus('email')}
-          onBlur={handleBlur}
+          onChange={handleChange("email")}
           error={Boolean(errors.email)}
           helperText={errors.email}
-          inputProps={{ 'aria-label': 'Email' }}
-          sx={{
-            '& .MuiInputBase-root': {
-              height: 46,
-            },
-            '& .MuiInputBase-input': {
-              padding: '10px 10px',
-              fontSize: '14px',
-            },
-          }}
+          inputProps={{ "aria-label": "Email" }}
         />
       </Box>
-
+      <Box sx={{ mb: 2 }}>
+        {!showCaptcha && (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showCaptcha}
+                onChange={(e) => {
+                  setShowCaptcha(e.target.checked);
+                  if (!e.target.checked) {
+                    setCaptchaToken(null);
+                  }
+                }}
+                sx={{
+                  color: "#2d5499",
+                  "&.Mui-checked": {
+                    color: "#2d5499",
+                  },
+                }}
+              />
+            }
+            label={
+              <Typography sx={{ fontSize: 13 }}>
+                Verify you are human
+              </Typography>
+            }
+          />
+        )}
+        {showCaptcha && (
+          <Box sx={{ mt: 1 }}>
+            <Turnstile
+              siteKey="0x4AAAAAACLeEQVBdQeog0Gn"
+              onSuccess={(token: any) => {
+                setCaptchaToken(token);
+              }}
+              onError={() => {
+                setCaptchaToken(null);
+              }}
+              onExpire={() => {
+                setCaptchaToken(null);
+              }}
+            />
+          </Box>
+        )}
+        {captchaError && !captchaToken && (
+          <Typography
+            variant="caption"
+            sx={{
+              color: "error.main",
+              fontSize: 12,
+              display: "block",
+              mt: 0.5,
+            }}
+          >
+            {captchaError}
+          </Typography>
+        )}
+      </Box>
       <PrimaryButton
         type="submit"
         disabled={isSubmitting}
         sx={{
           fontSize: 16,
           fontWeight: 500,
-          borderRadius: '8px',
-          mt: 2
+          borderRadius: "8px",
+          mt: 2,
+          height: 48,
         }}
       >
-        {isSubmitting ? 'Please wait…' : 'Next'}
+        {"Next"}
       </PrimaryButton>
     </Box>
   );
 };
 
 export default SignUpForm;
-
